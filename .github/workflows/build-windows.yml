@@ -1,0 +1,38 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        install: >-
+          base-devel
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+    
+    - name: Build xdelta
+      shell: msys2 {0}
+      run: |
+        cd xdelta1
+        make
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta-windows
+        path: |
+          xdelta1/xdelta.exe
+          xdelta1/*.dll
