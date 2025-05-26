@@ -1,0 +1,37 @@
+name: Debug Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Show environment
+      run: |
+        echo "=== Environment Info ==="
+        pwd
+        echo "=== Directory Contents ==="
+        ls -la
+        echo "=== Looking for xdelta ==="
+        find . -name "*xdelta*" -type d 2>/dev/null || echo "No xdelta directories found"
+        find . -name "*xdelta*" -type f 2>/dev/null || echo "No xdelta files found"
+        
+    - name: Try to access xdelta1
+      run: |
+        if [ -d "xdelta1" ]; then
+          echo "SUCCESS: Found xdelta1 directory"
+          cd xdelta1
+          pwd
+          ls -la
+        else
+          echo "ERROR: xdelta1 directory not found"
+          echo "Current directory structure:"
+          tree . || find . -type d
+          exit 1
+        fi
