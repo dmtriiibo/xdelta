@@ -1,10 +1,9 @@
-name: Build Xdelta3 on Windows
+name: Build & Release xdelta3 for Windows
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    tags:
+      - 'v*'  # Только при пуше тега v1.0.0, v3.1.0 и т.д.
   workflow_dispatch:
 
 jobs:
@@ -12,11 +11,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - name: Checkout source
+      uses: actions/checkout@f4f3dcd5162fdcbd1219777084a7f10f27f93c83  # v3.5.3
 
     - name: Install MSYS2
-      uses: msys2/setup-msys2@v2
+      uses: msys2/setup-msys2@4392b50dfb332105ab3eb1ec3f46f5bdb61b93ab  # v2.22.0
       with:
         update: true
         install: >-
@@ -27,14 +26,27 @@ jobs:
           gcc
           mingw-w64-x86_64-toolchain
 
-    - name: Build with MSYS2
+    - name: Build xdelta3
       shell: msys2 {0}
       run: |
         ./configure
         make
 
+    - name: Rename executable
+      shell: bash
+      run: |
+        mkdir -p dist
+        cp ./xdelta3/xdelta3.exe dist/xdelta3.exe
+
     - name: Upload artifact
-      uses: actions/upload-artifact@v3.1.3
+      uses: actions/upload-artifact@8f52e57c4c65057452b2f918d4e07a8d4fef8a56  # v3.1.3
       with:
         name: xdelta3-windows
-        path: ./xdelta3/xdelta3.exe
+        path: dist/xdelta3.exe
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/xdelta3.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
