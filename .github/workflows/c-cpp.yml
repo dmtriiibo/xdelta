@@ -34,7 +34,7 @@ jobs:
         make
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v3.1.3
       with:
         name: xdelta3-windows
         path: ./xdelta3/xdelta3.exe
