@@ -1,23 +1,40 @@
-name: C/C++ CI
+name: Build Xdelta3 on Windows
 
 on:
   push:
-    branches: [ "release3_1_apl" ]
+    branches: [ master ]
   pull_request:
-    branches: [ "release3_1_apl" ]
+    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
+  build-windows:
+    runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        update: true
+        install: >-
+          git
+          make
+          automake
+          autoconf
+          gcc
+          mingw-w64-x86_64-toolchain
+
+    - name: Build with MSYS2
+      shell: msys2 {0}
+      run: |
+        ./configure
+        make
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta3-windows
+        path: ./xdelta3/xdelta3.exe
