@@ -2,37 +2,133 @@ name: Build xdelta for Windows
 
 on:
   push:
+    branches: [ main, master ]
   pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
-
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        arch: [x86_64, i686]
+    
     steps:
-    - name: Set up MSYS2
-      uses: msys2/setup-msys2@v2
+    - name: Checkout code
+      uses: actions/checkout@v4
       with:
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-make
-
-    - name: Clone xdelta
-      run: git clone https://github.com/dmtriiibo/xdelta.git
-
-    - name: Build with CMake
-      shell: msys2 {0}
+        submodules: recursive
+    
+    - name: Install dependencies
       run: |
-        cd xdelta
-        mkdir build
-        cd build
-        cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-        mingw32-make
-
-    - name: Upload binary
+        sudo apt-get update
+        sudo apt-get install -y \
+          mingw-w64 \
+          mingw-w64-tools \
+          autotools-dev \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config \
+          make
+    
+    - name: Set up cross-compilation environment
+      run: |
+        if [ "${{ matrix.arch }}" = "x86_64" ]; then
+          echo "CC=x86_64-w64-mingw32-gcc" >> $GITHUB_ENV
+          echo "CXX=x86_64-w64-mingw32-g++" >> $GITHUB_ENV
+          echo "HOST=x86_64-w64-mingw32" >> $GITHUB_ENV
+          echo "ARCH_SUFFIX=x64" >> $GITHUB_ENV
+        else
+          echo "CC=i686-w64-mingw32-gcc" >> $GITHUB_ENV
+          echo "CXX=i686-w64-mingw32-g++" >> $GITHUB_ENV
+          echo "HOST=i686-w64-mingw32" >> $GITHUB_ENV
+          echo "ARCH_SUFFIX=x86" >> $GITHUB_ENV
+        fi
+    
+    - name: Generate configure script
+      run: |
+        autoreconf -fiv
+    
+    - name: Configure build
+      run: |
+        ./configure \
+          --host=${{ env.HOST }} \
+          --prefix=/usr/${{ env.HOST }} \
+          --enable-static \
+          --disable-shared \
+          CFLAGS="-O2 -static" \
+          CXXFLAGS="-O2 -static" \
+          LDFLAGS="-static"
+    
+    - name: Build xdelta
+      run: |
+        make -j$(nproc)
+    
+    - name: Create distribution directory
+      run: |
+        mkdir -p dist/xdelta-windows-${{ env.ARCH_SUFFIX }}
+        cp xdelta3/xdelta3.exe dist/xdelta-windows-${{ env.ARCH_SUFFIX }}/
+        cp README.md dist/xdelta-windows-${{ env.ARCH_SUFFIX }}/ || true
+        cp COPYING dist/xdelta-windows-${{ env.ARCH_SUFFIX }}/ || true
+    
+    - name: Test executable
+      run: |
+        # Проверяем, что файл создан и является PE-файлом
+        file dist/xdelta-windows-${{ env.ARCH_SUFFIX }}/xdelta3.exe
+        ls -la dist/xdelta-windows-${{ env.ARCH_SUFFIX }}/
+    
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: xdelta3.exe
-        path: xdelta/build/xdelta3.exe
+        name: xdelta-windows-${{ env.ARCH_SUFFIX }}
+        path: dist/xdelta-windows-${{ env.ARCH_SUFFIX }}/
+        retention-days: 30
+
+  create-release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+    
+    - name: Create release archives
+      run: |
+        cd artifacts/
+        for dir in */; do
+          if [ -d "$dir" ]; then
+            zip -r "${dir%/}.zip" "$dir"
+          fi
+        done
+        ls -la *.zip
+    
+    - name: Generate release tag
+      id: tag
+      run: |
+        TAG="build-$(date +'%Y%m%d-%H%M%S')"
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: "Windows Build ${{ steps.tag.outputs.tag }}"
+        draft: false
+        prerelease: true
+        files: artifacts/*.zip
+        body: |
+          Автоматическая сборка xdelta для Windows
+          
+          Включает:
+          - xdelta3.exe для x86_64 (64-bit)
+          - xdelta3.exe для i686 (32-bit)
+          
+          Собрано с помощью MinGW-w64 в среде Ubuntu Linux.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
