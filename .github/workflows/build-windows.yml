@@ -2,9 +2,7 @@ name: Build xdelta for Windows
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [release3_1_apl]
   workflow_dispatch:
 
 jobs:
