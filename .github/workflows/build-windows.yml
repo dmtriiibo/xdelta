@@ -1,9 +1,38 @@
-- name: Build with cmake & mingw
-  shell: msys2 {0}
-  run: |
-    git clone https://github.com/jmacd/xdelta.git
-    cd xdelta
-    mkdir build
-    cd build
-    cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-    mingw32-make
+name: Build xdelta for Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Set up MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+
+    - name: Clone xdelta
+      run: git clone https://github.com/jmacd/xdelta.git
+
+    - name: Build with CMake
+      shell: msys2 {0}
+      run: |
+        cd xdelta
+        mkdir build
+        cd build
+        cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+        mingw32-make
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3.exe
+        path: xdelta/build/xdelta3.exe
