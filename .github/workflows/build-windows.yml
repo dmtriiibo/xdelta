@@ -2,9 +2,9 @@ name: Windows Build (xdelta via MinGW)
 
 on:
   push:
-    branches: [ main ]
+    branches: [xdelta:release3_1_apl]
   pull_request:
-    branches: [ main ]
+    branches: [xdelta:release3_1_apl]
   workflow_dispatch:
 
 jobs:
